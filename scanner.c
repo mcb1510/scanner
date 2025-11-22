@@ -118,8 +118,82 @@ static ssize_t write(struct file *filp, const char __user *buf, size_t count, lo
 
 
 // This function reads tokens from the scanned data
-static ssize_t read(struct file *filp,char *buf,size_t count,loff_t *f_pos) { 
-  return -EINVAL; // not implemented
+static ssize_t read(struct file *filp,char __user *buf,size_t count,loff_t *f_pos) { 
+  File *file=filp->private_data;
+  size_t i;
+  int is_separator;
+
+  // no data to scan
+  if (!file->data || file->data_len == 0)
+    return -1;
+  
+  // Continuing reading from current token if not fully read
+  if (file->token_start < file->token_end) {
+    size_t token_len = file->token_end - file->token_start;
+    size_t remaining = token_len - file->token_read_pos;
+
+    // Still have part of the token to return
+    if (remaining > 0) {
+      size_t to_send = (remaining < count) ? remaining : count;
+      // copy token part to user space
+      if (copy_to_user(buf, file->data + file->token_start + file->token_read_pos, to_send))
+        return -EFAULT;
+      file->token_read_pos += to_send;
+      return to_send;
+    }
+    // token fully read, reset for next token
+    file->pos = file->token_end;
+    file->token_start = 0;
+    file->token_end = 0;
+    file->token_read_pos = 0;
+    return 0;
+  }
+  // Scan for next token
+  while (file->pos < file->data_len) {
+    is_separator = 0;
+    // check if current character is a separator
+    for (i = 0; i < file->sep_count; i++) {
+      if (file->data[file->pos] == file->separators[i]) {// found a separator
+        is_separator = 1;
+        break;
+      }
+    }
+    if (!is_separator)
+      break; // found the start of the next token
+    file->pos++; // skip separator
+
+  }
+  if (file->pos >= file->data_len)
+    return -1; // no more tokens
+
+  // find token start
+  file->token_start = file->pos;
+
+  // find token end
+  while (file->pos < file->data_len) {
+    is_separator = 0; // reset separator flag
+    for (i = 0; i < file->sep_count; i++) { // check for separator
+      if (file->data[file->pos] == file->separators[i]) {
+        is_separator = 1;
+        break;
+      }
+    }
+    if (is_separator)
+      break; // end of token found
+    file->pos++;
+  }
+  file->token_end = file->pos;
+  file->token_read_pos = 0; // reset token read position for new token
+  
+  //return token to user space
+  {
+    size_t token_len = file->token_end - file->token_start;
+    size_t to_send = (token_len < count) ? token_len : count;
+    if (copy_to_user(buf, file->data + file->token_start, to_send))
+      return -EFAULT;
+    file->token_read_pos += to_send;
+    return to_send;
+  }
 }
 
 // This function handles ioctl calls to set configuration mode
