@@ -73,13 +73,13 @@ static int release(struct inode *inode, struct file *filp) {
 }
 
 // This function handles both writing separators and writing data to be scanned
-static ssize_t write(struct file *filp, const char *buf, size_t count, loff_t *f_post) {
+static ssize_t write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos) {
   File *file = filp->private_data;
 
   // Write set separators = MODE 1
   if (file-> config_mode == 1) {
     // if there is existing separators, free them
-    if (file->separators) {
+    if (file->separators)
       kfree(file->separators);
 
     // allocate new separators
@@ -87,9 +87,9 @@ static ssize_t write(struct file *filp, const char *buf, size_t count, loff_t *f
     if (!file->separators)
       return -ENOMEM;
     // copy new separators from user space
-    if (copy_from_user(file->separators, buf, count)) {
+    if (copy_from_user(file->separators, buf, count))
       return -EFAULT;
-    }
+
     file->sep_count = count;
     file->config_mode = 0; // reset config mode after setting separators
     return count; 
@@ -97,16 +97,15 @@ static ssize_t write(struct file *filp, const char *buf, size_t count, loff_t *f
 
   // Write data to be scanned = MODE 0
   // free old data if exists
-  if (file->data) {
+  if (file->data)
     kfree(file->data);
   // allocate new data buffer
   file->data = kmalloc(count, GFP_KERNEL);
   if (!file->data)
     return -ENOMEM;
   // copy data from user space
-  if (copy_from_user(file->data, buf, count)) {
+  if (copy_from_user(file->data, buf, count))
     return -EFAULT;
-  }
   file->data_len = count;
 
   // reset scanning position
@@ -116,6 +115,7 @@ static ssize_t write(struct file *filp, const char *buf, size_t count, loff_t *f
   file->token_read_pos = 0;
   return count;
 }
+
 
 // This function reads tokens from the scanned data
 static ssize_t read(struct file *filp,char *buf,size_t count,loff_t *f_pos) { 
