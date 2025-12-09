@@ -1,3 +1,10 @@
+/* 
+ * File: scanner.c
+ * Description: Implementation of a character device that scans input data into tokens based on configurable separators.
+ * Author(s): Miguel Carrasco Belmar
+ * Date: 12/09/2025
+ */
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -10,6 +17,7 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("BSU CS 452 HW5");
 MODULE_AUTHOR("Miguel Carrasco Belmar");
 
+// This struct is used to hold per-device data
 typedef struct {
   dev_t devno;
   struct cdev cdev;
@@ -30,7 +38,7 @@ typedef struct {
   size_t token_read_pos; // read position within the current token
 } File;				/* per-open() data */
 
-static Device device; 
+static Device device;  // create device instance
 
 // This function is called when the file is opened to allocate and initialize per-file data
 static int open(struct inode *inode, struct file *filp) {
@@ -51,6 +59,8 @@ static int open(struct inode *inode, struct file *filp) {
     kfree(file);
     return -ENOMEM;
   }
+  
+  // Copy default separators from device to file
   memcpy(file->separators, device.default_separators, device.default_sep_count);
   file->sep_count=device.default_sep_count;
   file->config_mode=0;
@@ -209,7 +219,8 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
      file->sep_count=0; // reset separator count
      return 0;
    }
-    return -EINVAL; // invalid command
+   return -ENOTTY; 
+    //return -EINVAL; // invalid command
 }
 
 // File operations structure
@@ -239,12 +250,13 @@ static int __init my_init(void) {
     printk(KERN_ERR "%s: alloc_chrdev_region() failed\n",DEVNAME);
     return err;
   }
+  // This initializes the character device and adds it to the system
   cdev_init(&device.cdev,&ops);
   device.cdev.owner=THIS_MODULE;
   err=cdev_add(&device.cdev,device.devno,1);
   if (err) {
     printk(KERN_ERR "%s: cdev_add() failed\n",DEVNAME);
-    unregister_chrdev_region(device.devno,1);
+    unregister_chrdev_region(device.devno,1); 
     return err;
   }
   printk(KERN_INFO "%s: init\n",DEVNAME);

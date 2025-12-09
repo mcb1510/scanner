@@ -1,8 +1,16 @@
+/* 
+ * File: TryScanner.c
+ * Description: Test program for the scanner character device.
+ * Author(s): Miguel Carrasco Belmar
+ * Date: 12/09/2025
+ */
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/ioctl.h>
 
 #define ERR(s) err(s,__FILE__,__LINE__)
@@ -213,6 +221,7 @@ void test4_partial_reads() {
 }
 
 // Test 5: Handling NUL bytes in data
+// This test writes data containing NUL bytes and verifies correct tokenization.
 void test5_nul_bytes() {
   printf("Test 5: NUL Byte Handling\n");
   int fd=open("/dev/scanner",O_RDWR); // open device
@@ -273,6 +282,7 @@ void test5_nul_bytes() {
   }
 
 // Test 6: Empty write
+// This test writes zero bytes to the device and verifies behavior.
 void test6_empty_write() {
   printf("Test 6: Empty write\n");
   int fd=open("/dev/scanner",O_RDWR); // open device
@@ -300,6 +310,7 @@ void test6_empty_write() {
 }
 
 // Test 7: Multiple separators
+// This test sets multiple separators and verifies correct tokenization.
 void test7_multiple_separators() {
   printf("Test 7: Multiple Separators\n");
   int fd=open("/dev/scanner",O_RDWR); // open device
@@ -342,6 +353,8 @@ void test7_multiple_separators() {
   close(fd);
 }
 
+// Test 8: Multiple Instances
+// This test opens two instances of the device and verifies they maintain separate states.
 void test8_multiple_instances() {
   printf("Test 8: Multiple Instances\n");
   
@@ -424,6 +437,7 @@ void test8_multiple_instances() {
 }
 
 // Test 9: Null separator
+// This test sets a null byte as a separator and verifies correct tokenization.
 void test9_null_separator() {
   printf("Test 9: Null Separator\n");
 
@@ -478,6 +492,7 @@ void test9_null_separator() {
 }
 
 // Test 10: No separators
+// This test sets no separators and verifies that the entire input is treated as a single token.
 void test10_no_separators() {
   printf("Test 10: No Separators\n");
   int fd=open("/dev/scanner",O_RDWR); // open device
@@ -530,6 +545,7 @@ void test10_no_separators() {
 }
 
 // Test 11: Stress test for memory leaks
+// This test repeatedly opens, writes, reads, and closes the device to check for memory leaks.
 void test11_stress_test() {
   printf("Test 11: Stress Test for Memory Leaks\n");
   int iterations = 500;
@@ -582,7 +598,27 @@ void test11_stress_test() {
     printf("Test 11 result: FAIL\n");
 }
     
+// Test 12: Invalid ioctl handling
+// this test checks that invalid ioctl commands return -ENOTTY
+void test12_invalid_ioctl() {
+  printf("Test 12: Invalid IOCTL Handling\n");
+  int fd=open("/dev/scanner",O_RDWR); // open device
+  if (fd<0){
+    ERR("open() failed");
+  }
 
+  errno = 0; // reset errno
+  int result = ioctl(fd,9999,0); // invalid ioctl
+
+  if (result == -1 && errno == ENOTTY) { 
+    printf("Invalid ioctl correctly returned ENOTTY (%d)\n", errno);
+    printf("Test 13 result: PASS\n");
+  } else {
+    printf("Invalid ioctl result: %d (errno=%d)\n", result, errno);
+    printf("Test 13 result: FAIL\n");
+  }
+  close(fd);
+}
 
 int main() {
 
@@ -598,5 +634,6 @@ int main() {
   test9_null_separator();
   test10_no_separators();
   test11_stress_test(); // for memmory leaks
+  test12_invalid_ioctl();
   return 0;
 }
