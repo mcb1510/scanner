@@ -1,0 +1,18 @@
+# Compiled output
+*.o
+*.out
+*.exe
+scanner
+TryScanner
+
+# Build folders
+build/
+bin/
+
+# Editor junk
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
